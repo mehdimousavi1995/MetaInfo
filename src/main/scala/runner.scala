@@ -1,16 +1,18 @@
-import java.net.URL
+import java.net.{URL, URLConnection}
 
 import org.jsoup.Jsoup
 import org.jsoup.select.Elements
 
 import scala.annotation.tailrec
 import scala.util.Try
-
+import PreviewMaker._
 
 object PreviewMaker {
 
   val http = "http://"
   val https = "https://"
+
+  val minSize = 3000
 
   trait MetaTag {
     val tagName: String
@@ -40,15 +42,20 @@ object PreviewMaker {
     override val tagName: String = "topic"
   }
 
-
   val metaTagsList: List[MetaTag] = List(Image, Title, Description, Keywords, Subject, Topic)
-
 
   def dropSlash(host: String): String = {
     if (host.startsWith("/"))
       dropSlash(host.substring(1))
     else host
   }
+
+  def getImageSize(url: String): Int = {
+    val jUrl = new URL(url)
+    val urlConnection = jUrl.openConnection
+    urlConnection.getContentLength
+  }
+
 
   def getFirstImage(url: String): String = {
     val doc = Jsoup.connect(url).get()
@@ -58,11 +65,12 @@ object PreviewMaker {
 
     def getFirstLink(elements: List[String]): String = elements match {
       case l :: ls =>
-        if (Try(new URL(l).getContent).isFailure)
+        if ((Try(new URL(l).getContent).isFailure || l.split("\\.").contains("gif")) || getImageSize(l) < minSize)
           getFirstLink(ls)
         else l
       case Nil => ""
     }
+
     getFirstLink(elementsList)
   }
 
@@ -96,10 +104,14 @@ object PreviewMaker {
             } else {
               result += Image.tagName -> (http + imageUrl)
             }
+          } else {
+            val firstImageUrl = getFirstImage(url)
+            if (firstImageUrl != "")
+              result += Image.tagName -> firstImageUrl
           }
         case _ =>
           val firstImageUrl = getFirstImage(url)
-          if(firstImageUrl != "")
+          if (firstImageUrl != "")
             result += Image.tagName -> firstImageUrl
       }
       result
@@ -112,14 +124,17 @@ object PreviewMaker {
 object main extends App {
   val url = "https://www.instagram.com/cristiano/?hl=en"
   val urlList = List(
-    "https://open.spotify.com/track/0pfTaJ4yIabw0JRZf7TZ7L")
+    "http://www.varzesh3.com")
 
 
   urlList.foreach { url =>
     val result = PreviewMaker.getPreview(url)
     println(s"****************************** url: ${url} ***************************************************")
-    result.foreach(s => println(s._1 + " : " + s._2))
+    val str = result.get("image").get
+    println("size : " + getImageSize(str))
+    println("url : " + str)
     println
   }
+
 
 }
