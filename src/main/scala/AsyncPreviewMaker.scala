@@ -1,21 +1,14 @@
 
-import java.net.{URL, URLConnection}
+import java.net.{URL}
 
 import org.jsoup.Jsoup
 import org.jsoup.select.Elements
-
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
-//import PreviewMaker._
-import akka.actor.ActorSystem
-import akka.util.Timeout
 import org.jsoup.nodes.Document
-
 import scala.concurrent.Future
-import scala.concurrent.forkjoin._
-
-// the following is equivalent to `implicit val ec = ExecutionContext.global`
 import scala.concurrent.ExecutionContext.Implicits.global
+
 
 object PreviewMaker {
 
@@ -68,12 +61,7 @@ object PreviewMaker {
   }
 
 
-  def getFirstImage(url: String): String = {
-    val doc = Jsoup.connect(url).get()
-    val imgs: Elements = doc.select("body").select("img")
-    var elementsList = List.empty[String]
-    imgs.forEach { element => elementsList = element.absUrl("src") :: elementsList }
-
+  def getFirstImage(url: String): Future[String] = {
     def getFirstLink(elements: List[String]): String = elements match {
       case l :: ls =>
         if ((Try(new URL(l).getContent).isFailure || l.split("\\.").contains("gif")) || getImageSize(l) < minSize)
@@ -82,7 +70,12 @@ object PreviewMaker {
       case Nil => ""
     }
 
-    getFirstLink(elementsList)
+    val images: Future[Elements] = Future(Jsoup.connect(url).get().select("body").select("img"))
+    images.map { result =>
+      var elementsList = List.empty[String]
+      result.forEach { element => elementsList = element.absUrl("src") :: elementsList }
+      getFirstLink(elementsList)
+    }
   }
 
   def getPreview(url: String): Future[Map[String, String]] = {
@@ -96,11 +89,36 @@ object PreviewMaker {
         case Nil =>
           intermediateResult
       }
+
       val document = Future(Jsoup.connect(url).get)
       val result: Future[Map[String, String]] = document.map { doc =>
         buildPreview(metaTagsList, doc, Map.empty).filter(_._2.size > 0)
       }
-      result
+
+      result.flatMap { map =>
+        val imgUrl = map.get(Image.tagName).getOrElse("-1")
+        if (imgUrl != "-1" && !imgUrl.split("\\.").contains("gif")) {
+          val imageUrl = dropSlash(imgUrl)
+          if (Try(new URL(imageUrl).getContent).isFailure) {
+            if (Try(new URL(http + imageUrl).getContent).isFailure) {
+              if (Try(new URL(https + imageUrl).getContent).isFailure) {
+                result map (m => m ++ Map(Image.tagName -> (jUrl.get.getProtocol + "://" + jUrl.get.getHost + "/" + imageUrl)))
+              } else {
+                result map (m => m ++ Map(Image.tagName -> (https + imageUrl)))
+              }
+            } else {
+              result map (m => m ++ Map(Image.tagName -> (http + imageUrl)))
+            }
+          } else {
+            result
+          }
+        } else {
+          getFirstImage(url) flatMap { firstImgUrl =>
+            result.map(m => m ++ Map(Image.tagName -> firstImgUrl))
+          }
+        }
+      }
+
     } else Future.successful(Map.empty)
   }
 
@@ -108,13 +126,14 @@ object PreviewMaker {
 
 object runner extends App {
 
-  val previewMaker = PreviewMaker.getPreview("http://www.nationalgeographic.com/")
+  val previewMaker = PreviewMaker.getPreview("http://www.sex.com/pin/54811236-nude-selfie-great-personality-17535/")
   previewMaker onComplete {
     case Success(s) =>
       println(s.toString)
     case Failure(f) => println(f.getMessage)
   }
 
-  Thread.sleep(4999)
+
+  Thread.sleep(60000)
 }
 
