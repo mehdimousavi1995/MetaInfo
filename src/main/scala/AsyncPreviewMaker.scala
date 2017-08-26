@@ -68,6 +68,10 @@ object PreviewMaker {
       var elementsList = List.empty[String]
       result.forEach { element => elementsList = element.absUrl("src") :: elementsList }
       getFirstLink(elementsList)
+    }.recover {
+      case e: Throwable =>
+        // log.warning("failed to get image link from {}, caused by: {}", url, e.getMessage)
+        ""
     }
   }
 
@@ -92,24 +96,24 @@ object PreviewMaker {
         val imgUrl = map.get(Image.tagName).getOrElse("-1")
         if (imgUrl != "-1" && !imgUrl.split("\\.").contains("gif")) {
           val imageUrl = dropSlash(imgUrl)
-          if (Try(new URL(imageUrl).getContent).isFailure) {
-            if (Try(new URL(http + imageUrl).getContent).isFailure) {
-              if (Try(new URL(https + imageUrl).getContent).isFailure) {
+          if (Try(new URL(imageUrl).getContent).isFailure)
+            if (Try(new URL(http + imageUrl).getContent).isFailure)
+              if (Try(new URL(https + imageUrl).getContent).isFailure)
                 result map (m => m ++ Map(Image.tagName -> (jUrl.get.getProtocol + "://" + jUrl.get.getHost + "/" + imageUrl)))
-              } else {
+              else
                 result map (m => m ++ Map(Image.tagName -> (https + imageUrl)))
-              }
-            } else {
+            else
               result map (m => m ++ Map(Image.tagName -> (http + imageUrl)))
-            }
-          } else {
+          else
             result
-          }
-        } else {
+        } else
           getFirstImage(url) flatMap { firstImgUrl =>
             result.map(m => m ++ Map(Image.tagName -> firstImgUrl))
           }
-        }
+      }.recover {
+        case e: Throwable =>
+          // log.warning("failed to get preview link from {}, caused by: {}", url, e.getMessage)
+          Map.empty
       }
 
     } else Future.successful(Map.empty)
@@ -119,7 +123,7 @@ object PreviewMaker {
 
 object runner extends App {
 
-  val previewMaker = PreviewMaker.getPreview("http://news.nationalgeographic.com/2017/08/these-adaptations-give-insects-a-survival-advantage/")
+  val previewMaker = PreviewMaker.getPreview("http://news.nationalgeographic.com/2017/08/ancient-babylonian-trigonometry-tablet-plimpton-322-video-spd/")
   previewMaker onComplete {
     case Success(s) =>
       println(s.toString)
