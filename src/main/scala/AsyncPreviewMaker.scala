@@ -34,19 +34,12 @@ object PreviewMaker {
     override val tagName: String = "description"
   }
 
-  object Keywords extends MetaTag {
-    override val tagName: String = "keywords"
-  }
-
-  object Subject extends MetaTag {
-    override val tagName: String = "subject"
-  }
 
   object Topic extends MetaTag {
     override val tagName: String = "topic"
   }
 
-  val metaTagsList: List[MetaTag] = List(Image, Title, Description, Keywords, Subject, Topic)
+  val metaTagsList: List[MetaTag] = List(Image, Title, Description, Topic)
 
   def dropSlash(host: String): String = {
     if (host.startsWith("/"))
@@ -126,7 +119,7 @@ object PreviewMaker {
 
 object runner extends App {
 
-  val previewMaker = PreviewMaker.getPreview("http://www.sex.com/pin/54811236-nude-selfie-great-personality-17535/")
+  val previewMaker = PreviewMaker.getPreview("http://news.nationalgeographic.com/2017/08/these-adaptations-give-insects-a-survival-advantage/")
   previewMaker onComplete {
     case Success(s) =>
       println(s.toString)
