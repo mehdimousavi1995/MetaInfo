@@ -1,4 +1,4 @@
-target/
+target/*
 .ensime_cache
 conf
 server.log
@@ -20,7 +20,7 @@ nasim-dashboard/logs
 .idea/dynamic.xml
 .idea/uiDesigner.xml
 .idea/libraries
-.idea
+.idea/*
 .gradle
 src/main/resources/logback.xml
 data
